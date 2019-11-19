@@ -1,0 +1,221 @@
+---
+title: "DZ5_SVM"
+author: "Kate"
+date: '2 апреля 2018 г '
+output: html_document
+---
+```{r}
+library(e1071)
+```
+
+## Support vector machines
+
+Загрузим наши данные:
+
+```{r}
+Sonar <- read.table(file="D:\\Учеба\\8 семестр\\Коробейников\\Sonar.txt", header=TRUE, sep=" ") 
+Sonar
+```
+
+
+Нам нужно: 1/3 для теста, и 2/3 для svm
+
+```{r}
+#сделаем рандомно это
+n <- nrow(Sonar)
+index <- sample(n)
+index
+#т.е. 208/3=69,...   берем первые 69 для теста, остальные для программы
+```
+
+
+```{r}
+SonarRand <- Sonar[index,]
+SonarTest <- SonarRand[1:69,]
+SonarProg <- SonarRand[(69+1):nrow(Sonar),]
+
+
+SonarTest 
+SonarProg 
+```
+
+
+Теперь сам метод SVM на выборке для проги:
+Строим SVM (т.е. тут параметры по умолчанию)
+
+```{r}
+model <- svm(Class ~ ., data = SonarProg)
+print(model)
+summary(model)
+```
+
+
+```{r}
+modellinear <- svm(Class ~ ., data = SonarProg, kernel = "linear")
+summary(modellinear)
+```
+
+
+
+
+```{r}
+modelpoly <- svm(Class ~ ., data = SonarProg, kernel = "polynomial")
+summary(modelpoly)
+```
+Проверим точность классификации:
+
+
+```{r}
+table(SonarProg$Class == predict(model, subset(SonarProg), select = -Class))
+
+table(SonarProg$Class == predict(modellinear, subset(SonarProg), select = -Class))
+
+table(SonarProg$Class == predict(modelpoly, subset(SonarProg), select = -Class))
+```
+
+Для тестовой svm:
+```{r}
+table(SonarTest$Class == predict(model, subset(SonarTest), select = -Class))
+
+table(SonarTest$Class == predict(modellinear, subset(SonarTest), select = -Class))
+
+table(SonarTest$Class == predict(modelpoly, subset(SonarTest), select = -Class))
+```
+
+
+
+###  Tune svm
+
+```{r}
+modeltune <- tune(svm, Class~., data = SonarProg, ranges = list(gamma = 2^(-15:3), cost = 2^(-1:9)))
+
+summary(modeltune)$best.model
+```
+
+
+```{r}
+summary(modeltune)$performances
+log2(summary(modeltune)$performances)
+
+plot(modeltune, transform.x = log2, transform.y = log2)
+```
+
+В качестве показателя эффективности используется классификационная ошибка для классификации и среднеквадратичная ошибка для регрессии.
+
+
+
+```{r}
+summary(modeltune)$performances
+log2(summary(modeltune)$performances)
+```
+
+```{r}
+modeltunesvm <- tune.svm(Class~., data = SonarProg, gamma = 2^(-5:5), cost = 2^(-5:0))
+
+summary(modeltunesvm)$best.model
+```
+
+
+
+Строим SVM с оптимальными параметрами:
+
+Правильно (для теста):
+
+```{r}
+Prav <- matrix(c(36,0,0,33), nrow = 2, dimnames = list(c("R", "M"), c("R", "M")))
+Prav
+```
+
+
+SVM (по умолчанию)
+
+```{r}
+x <- subset(SonarTest, select = -Class)
+y <- SonarTest$Class
+pred <- predict(model,x)
+table(pred, y)
+```
+
+Модель с оптимальными параметрами:
+
+```{r}
+modelsuper <- svm(Class ~ ., data = SonarTest, gamma=modeltune$best.parameters$gamma, cost=modeltune$best.parameters$cost)
+predsuper <- predict(modelsuper,x)
+table(predsuper, y) 
+```
+
+
+```{r}
+modelsuper2 <- svm(Class ~ ., data = SonarTest, gamma=modeltunesvm$best.parameters$gamma, cost=modeltunesvm$best.parameters$cost)
+predsuper2 <- predict(modelsuper2,x)
+table(predsuper2, y)
+```
+
+
+
+
+
+Правильно (для обучающей):
+
+```{r}
+Prav <- matrix(c(73,0,0,66), nrow = 2, dimnames = list(c("R", "M"), c("R", "M")))
+Prav
+```
+
+
+SVM (по умолчанию)
+
+```{r}
+x <- subset(SonarProg, select = -Class)
+y <- SonarProg$Class
+pred <- predict(model,x)
+table(pred, y)
+```
+
+Модель с оптимальными параметрами:
+
+```{r}
+modelsuper <- svm(Class ~ ., data = SonarProg, gamma=modeltune$best.parameters$gamma, cost=modeltune$best.parameters$cost)
+predsuper <- predict(modelsuper,x)
+table(predsuper, y) 
+```
+
+
+```{r}
+modelsuper2 <- svm(Class ~ ., data = SonarProg, gamma=modeltunesvm$best.parameters$gamma, cost=modeltunesvm$best.parameters$cost)
+predsuper2 <- predict(modelsuper2,x)
+table(predsuper2, y)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+log2(summary(modeltune)$performances[order(summary(modeltune)$performances[,3]),][1,])
+
+plot(modeltune, transform.x = log2, transform.y = log2, color.palette = rainbow, zlim = c(0.10, 0.25))
+```
